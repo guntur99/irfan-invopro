@@ -5,9 +5,15 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
-    "preview": "astro preview"
+    "preview": "astro preview",
+    "start": "node scripts/migrate.mjs && node dist/server/entry.mjs"
   },
   "dependencies": {
-    "astro": "^5.18.2"
+    "@astrojs/node": "^9.5.5",
+    "astro": "^5.18.2",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1"
   }
 }

@@ -1,9 +1,5 @@
 ---
 import html from '../app.html?raw';
-
-const url = import.meta.env.PUBLIC_SUPABASE_URL ?? '';
-const key = import.meta.env.PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? '';
-const config = `<script>window.SUPABASE_URL=${JSON.stringify(url)};window.SUPABASE_PUBLISHABLE_KEY=${JSON.stringify(key)};</script>`;
-const page = html.replace('<!--SUPABASE_CONFIG-->', () => config);
+export const prerender = true;
 ---
-<Fragment set:html={page} />
+<Fragment set:html={html} />

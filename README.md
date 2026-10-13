@@ -1,59 +1,39 @@
-# InvoPro V15 Cloud
+# InvoPro
 
-Versi ini memakai **Supabase Auth + Postgres**. Invoice, quotation, settings, dan user tidak lagi bergantung pada localStorage.
+Aplikasi invoice & quotation. Astro (SSR, Node) + PostgreSQL. Auth memakai session cookie (password di-hash dengan scrypt), data per user tersimpan di Postgres.
 
-## 1. Buat project Supabase
-1. Buat project baru di Supabase.
-2. Buka **SQL Editor**.
-3. Paste dan jalankan isi `supabase-schema.sql`.
+## Env
+| Variabel | Keterangan |
+|---|---|
+| `DATABASE_URL` | Connection string Postgres, mis. `postgres://user:pass@host:5432/invopro` |
+| `ALLOW_SIGNUP` | `true` untuk membuka pendaftaran publik. Default tutup; akun dibuat Admin lewat Users & Access |
 
-## 1b. Atau: Supabase self-hosted di Coolify
-1. Coolify > New Resource > Services > **Supabase**, atur domain untuk Kong (API) dan Studio, lalu deploy.
-2. Buka Studio > SQL Editor, jalankan `supabase-schema.sql`.
-3. Pakai `SERVICE_SUPABASEKONG_URL` (domain API) sebagai `PUBLIC_SUPABASE_URL` dan `SERVICE_SUPABASEANON_KEY` sebagai `PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
-4. Edge function `admin-users`: salin `supabase/functions/admin-users/` ke volume functions service Supabase (`volumes/functions/admin-users/index.ts`), lalu restart container `supabase-edge-functions`.
-5. Di service Supabase, set `ENABLE_EMAIL_AUTOCONFIRM=true` bila belum ada SMTP, dan `SITE_URL` ke domain app ini.
+Lihat `.env.example`.
 
-## 2. Isi konfigurasi frontend
-Project ini memakai Astro. Salin `.env.example` ke `.env` (lokal) atau isi sebagai env di hosting:
-
-```
-PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
-PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
-```
-
-Nilai ini di-inject saat build, jadi ubah env berarti harus rebuild. Jangan pernah memakai **service role / secret key** di variabel `PUBLIC_*`.
-
-Lokal: `npm install && npm run dev`.
-
-## 3. Login pertama
-Klik **Create account** di halaman login. User pertama yang dibuat otomatis menjadi `Admin` oleh trigger SQL. Akun berikutnya default menjadi `User`.
-
-Jika email confirmation aktif, verifikasi email dulu sebelum login.
-
-## 4. Deploy Edge Function untuk Users & Access
-User Management (create/reset/disable/delete user) butuh server-side function supaya service role key tetap rahasia.
-
-Dengan Supabase CLI:
-
+## Lokal
 ```bash
-supabase login
-supabase link --project-ref YOUR_PROJECT_REF
-supabase functions deploy admin-users
+cp .env.example .env   # isi DATABASE_URL
+npm install
+npm run build && npm start   # start otomatis menjalankan migrasi db/schema.sql
 ```
 
-Function menggunakan environment secret bawaan Supabase (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`).
+## Deploy di Coolify
+1. New Resource > Database > **PostgreSQL**, deploy, salin *Internal URL*.
+2. New Resource > Application dari repo ini. Build pack **Nixpacks/Railpack**:
+   - Build Command: `npm run build`
+   - Start Command: `npm start`
+   - Port: `4321` (atau set env `PORT` dan `HOST=0.0.0.0`)
+3. Env: `DATABASE_URL` (Internal URL dari langkah 1).
+4. Deploy. Schema dibuat otomatis saat start (idempotent).
+5. Buka app dan klik **Create account**: user pertama otomatis jadi **Admin**. Setelah itu pendaftaran publik tertutup.
 
-## 5. Deploy website
-- **Coolify:** build pack Static (atau Nixpacks), Build Command `npm run build`, Publish Directory `dist`. Tambahkan dua env `PUBLIC_*` di atas sebagai build variable.
-- **Netlify:** `netlify.toml` sudah diatur (`dist`).
+Jadwalkan backup untuk database Postgres di Coolify (S3 atau storage lain).
 
-## Data online
-- `profiles`: profil & role user
-- `documents`: invoice / quotation per user
-- `user_settings`: company profile, logo, template, font settings
-
-Semua tabel memakai **Row Level Security**, sehingga user biasa hanya dapat membaca/menulis data miliknya sendiri.
+## Struktur
+- `src/app.html` — UI (satu halaman, dimuat oleh `src/pages/index.astro`)
+- `src/pages/api/*` — endpoint auth, documents, settings, admin/users
+- `src/lib/` — pool Postgres, helper auth/session
+- `db/schema.sql`, `scripts/migrate.mjs` — schema dan migrasi
 
 ## Catatan
-Logo saat ini disimpan di JSON settings sebagai data URL untuk menjaga kompatibilitas dengan versi sebelumnya. Untuk penggunaan produksi skala besar, pindahkan logo ke Supabase Storage.
+Logo disimpan di JSON settings sebagai data URL. Untuk skala besar, pindahkan ke object storage.
