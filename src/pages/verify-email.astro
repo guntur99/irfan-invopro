@@ -1,0 +1,36 @@
+---
+export const prerender = false;
+const token = Astro.url.searchParams.get('token') || '';
+---
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width" />
+  <title>Aktivasi Email — InvoPro</title>
+  <style>
+    body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f6f8fc;font-family:Inter,Arial,sans-serif;color:#0f172a}.card{width:min(92vw,480px);background:#fff;border:1px solid #e8edf5;border-radius:18px;padding:32px;box-shadow:0 18px 50px rgba(15,23,42,.08)}.brand{font-size:22px;font-weight:800;margin-bottom:22px}.icon{width:48px;height:48px;border-radius:14px;background:#eff6ff;color:#2563eb;display:grid;place-items:center;font-size:24px;margin-bottom:18px}h1{font-size:26px;margin:0 0 10px}p{color:#64748b;line-height:1.65;margin:0 0 18px}.btn{display:inline-block;background:#2563eb;color:#fff;text-decoration:none;font-weight:700;padding:12px 18px;border-radius:10px}.err{color:#dc2626}.ok{color:#15803d}.muted{font-size:12px;color:#94a3b8}
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="brand">InvoPro</div>
+    <div class="icon" id="icon">…</div>
+    <h1 id="title">Memverifikasi email…</h1>
+    <p id="message">Tunggu sebentar, kami sedang mengaktifkan akun kamu.</p>
+    <a class="btn" id="loginLink" href="/" style="display:none">Kembali ke Login</a>
+    <p class="muted" id="hint"></p>
+  </main>
+  <script define:vars={{ token }}>
+    const title=document.getElementById('title'),message=document.getElementById('message'),icon=document.getElementById('icon'),login=document.getElementById('loginLink'),hint=document.getElementById('hint');
+    (async()=>{
+      if(!token){title.textContent='Link aktivasi tidak valid';message.textContent='Token aktivasi tidak ditemukan.';message.className='err';icon.textContent='!';return}
+      try{
+        const r=await fetch('/api/auth/verify-email?token='+encodeURIComponent(token),{credentials:'same-origin'});const out=await r.json();
+        if(!r.ok)throw new Error(out.error||'Aktivasi gagal.');
+        title.textContent='Email berhasil diverifikasi';message.textContent='Akun InvoPro kamu sudah aktif. Sekarang kamu bisa login.';message.className='ok';icon.textContent='✓';login.style.display='inline-block';
+      }catch(e){title.textContent='Aktivasi gagal';message.textContent=e.message||'Link aktivasi tidak valid atau sudah kedaluwarsa.';message.className='err';icon.textContent='!';hint.textContent='Kembali ke halaman login lalu kirim ulang email aktivasi.';login.style.display='inline-block'}
+    })();
+  </script>
+</body>
+</html>
