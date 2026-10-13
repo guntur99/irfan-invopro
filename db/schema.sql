@@ -7,17 +7,25 @@ create table if not exists users (
   password_hash text not null,
   role text not null default 'User',
   active boolean not null default true,
-  email_verified_at timestamptz,
   created_at timestamptz not null default now()
 );
 
-alter table users add column if not exists email_verified_at timestamptz;
+-- Migrasi aman: hanya akun yang sudah ada sebelum fitur verifikasi ditambahkan
+-- yang otomatis dianggap verified.
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='users' and column_name='email_verified_at'
+  ) then
+    alter table users add column email_verified_at timestamptz;
+    update users set email_verified_at=created_at;
+  end if;
+end $$;
+
 alter table users drop constraint if exists users_role_check;
 update users set role='User' where role not in ('Owner','User');
 alter table users add constraint users_role_check check (role in ('Owner','User'));
--- Akun lama dianggap sudah terverifikasi agar migrasi tidak mengunci user existing.
-update users set email_verified_at=created_at where email_verified_at is null and created_at < now();
-
 create unique index if not exists users_email_idx on users (lower(email));
 
 create table if not exists sessions (
