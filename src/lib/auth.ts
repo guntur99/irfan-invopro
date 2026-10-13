@@ -78,7 +78,7 @@ export async function requireUser(ctx: APIContext, role?: 'Owner'): Promise<User
   }
   const user = await getUser(ctx);
   if (!user) throw new HttpError(401, 'Unauthorized');
-  if (!user.email_verified_at && user.role !== 'Owner') throw new HttpError(403, 'Email belum diverifikasi.');
+  if (!user.email_verified_at) throw new HttpError(403, 'Email belum diverifikasi.');
   if (role && user.role !== role) throw new HttpError(403, 'Owner only');
   return user;
 }
