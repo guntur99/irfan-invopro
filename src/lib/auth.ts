@@ -5,7 +5,7 @@ import { pool } from './db';
 const COOKIE = 'invopro_session';
 const SESSION_DAYS = 14;
 
-export type User = { id: string; email: string; name: string; role: 'Admin' | 'Staff' | 'User'; active: boolean };
+export type User = { id: string; email: string; name: string; role: 'Owner' | 'User'; active: boolean; email_verified_at?: string | null };
 
 export const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -31,10 +31,19 @@ export async function verifyPassword(pw: string, stored: string) {
   return key.length === expected.length && timingSafeEqual(key, expected);
 }
 
-const sha = (t: string) => createHash('sha256').update(t).digest('hex');
+export const sha = (t: string) => createHash('sha256').update(t).digest('hex');
+export const randomToken = () => randomBytes(32).toString('base64url');
+export const ownerEmail = () => String(process.env.OWNER_EMAIL || '').trim().toLowerCase();
+export const roleForEmail = (email: string): 'Owner' | 'User' => email.trim().toLowerCase() === ownerEmail() ? 'Owner' : 'User';
+
+export async function syncRoleForUser(id: string, email: string) {
+  const role = roleForEmail(email);
+  await pool.query('update users set role=$2 where id=$1 and role<>$2', [id, role]);
+  return role;
+}
 
 export async function createSession(ctx: APIContext, userId: string) {
-  const token = randomBytes(32).toString('base64url');
+  const token = randomToken();
   const expires = new Date(Date.now() + SESSION_DAYS * 86400_000);
   await pool.query('insert into sessions (token_hash,user_id,expires_at) values ($1,$2,$3)', [sha(token), userId, expires]);
   ctx.cookies.set(COOKIE, token, {
@@ -52,22 +61,25 @@ export async function getUser(ctx: APIContext): Promise<User | null> {
   const token = ctx.cookies.get(COOKIE)?.value;
   if (!token) return null;
   const { rows } = await pool.query(
-    `select u.id,u.email,u.name,u.role,u.active from sessions s join users u on u.id=s.user_id
+    `select u.id,u.email,u.name,u.role,u.active,u.email_verified_at from sessions s join users u on u.id=s.user_id
      where s.token_hash=$1 and s.expires_at>now() and u.active`,
     [sha(token)],
   );
-  return rows[0] ?? null;
+  const user = rows[0] ?? null;
+  if (!user) return null;
+  user.role = await syncRoleForUser(user.id, user.email);
+  return user;
 }
 
-// Tolak request tulis dari origin lain (CSRF), lalu wajib login.
-export async function requireUser(ctx: APIContext, role?: 'Admin'): Promise<User> {
+export async function requireUser(ctx: APIContext, role?: 'Owner'): Promise<User> {
   if (!['GET', 'HEAD'].includes(ctx.request.method)) {
     const origin = ctx.request.headers.get('origin');
     if (origin && new URL(origin).host !== ctx.request.headers.get('host')) throw new HttpError(403, 'Forbidden');
   }
   const user = await getUser(ctx);
   if (!user) throw new HttpError(401, 'Unauthorized');
-  if (role && user.role !== role) throw new HttpError(403, 'Admin only');
+  if (!user.email_verified_at && user.role !== 'Owner') throw new HttpError(403, 'Email belum diverifikasi.');
+  if (role && user.role !== role) throw new HttpError(403, 'Owner only');
   return user;
 }
 
@@ -76,7 +88,6 @@ export function checkOrigin(ctx: APIContext) {
   if (origin && new URL(origin).host !== ctx.request.headers.get('host')) throw new HttpError(403, 'Forbidden');
 }
 
-// Pembatas percobaan login sederhana (in-memory, per instance).
 const attempts = new Map<string, { n: number; reset: number }>();
 export function rateLimit(key: string, max = 8, windowMs = 10 * 60_000) {
   const now = Date.now();
