@@ -7,6 +7,13 @@ Versi ini memakai **Supabase Auth + Postgres**. Invoice, quotation, settings, da
 2. Buka **SQL Editor**.
 3. Paste dan jalankan isi `supabase-schema.sql`.
 
+## 1b. Atau: Supabase self-hosted di Coolify
+1. Coolify > New Resource > Services > **Supabase**, atur domain untuk Kong (API) dan Studio, lalu deploy.
+2. Buka Studio > SQL Editor, jalankan `supabase-schema.sql`.
+3. Pakai `SERVICE_SUPABASEKONG_URL` (domain API) sebagai `PUBLIC_SUPABASE_URL` dan `SERVICE_SUPABASEANON_KEY` sebagai `PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
+4. Edge function `admin-users`: salin `supabase/functions/admin-users/` ke volume functions service Supabase (`volumes/functions/admin-users/index.ts`), lalu restart container `supabase-edge-functions`.
+5. Di service Supabase, set `ENABLE_EMAIL_AUTOCONFIRM=true` bila belum ada SMTP, dan `SITE_URL` ke domain app ini.
+
 ## 2. Isi konfigurasi frontend
 Project ini memakai Astro. Salin `.env.example` ke `.env` (lokal) atau isi sebagai env di hosting:
 
